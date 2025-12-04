@@ -1,0 +1,50 @@
+services:
+  # PostgreSQL Database - runs locally on NAS
+  database:
+    image: postgres:15-alpine
+    container_name: calculator-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=calculator
+      - POSTGRES_PASSWORD=calc123secure
+      - POSTGRES_DB=calculatordb
+    volumes:
+      - calculator_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calculator -d calculatordb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build: ./backend
+    container_name: calculator-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://calculator:calc123secure@database:5432/calculatordb
+      - PORT=3001
+    depends_on:
+      database:
+        condition: service_healthy
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=
+    container_name: calculator-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  calculator_data:
